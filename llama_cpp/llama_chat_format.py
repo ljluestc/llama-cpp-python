@@ -795,17 +795,32 @@ def guess_chat_format_from_gguf_metadata(metadata: Dict[str, str]) -> Optional[s
     if "tokenizer.chat_template" not in metadata:
         return None
 
-    if metadata["tokenizer.chat_template"] == CHATML_CHAT_TEMPLATE:
+    template = metadata["tokenizer.chat_template"]
+
+    # Fast path: exact matches against well-known templates
+    if template == CHATML_CHAT_TEMPLATE:
         return "chatml"
 
-    if (
-        metadata["tokenizer.chat_template"] == MISTRAL_INSTRUCT_CHAT_TEMPLATE
-        or metadata["tokenizer.chat_template"] == MIXTRAL_INSTRUCT_CHAT_TEMPLATE
-    ):
+    if template in (MISTRAL_INSTRUCT_CHAT_TEMPLATE, MIXTRAL_INSTRUCT_CHAT_TEMPLATE):
         return "mistral-instruct"
 
-    if metadata["tokenizer.chat_template"] == LLAMA3_INSTRUCT_CHAT_TEMPLATE:
+    if template == LLAMA3_INSTRUCT_CHAT_TEMPLATE:
         return "llama-3"
+
+    # Heuristic detection mirroring C++ llm_chat_detect_template().
+    # This catches template variants (e.g. DeepSeek-R1-Distill-Qwen) that
+    # are chatml-compatible but don't match the exact reference string.
+    if "<|im_start|>" in template:
+        # Exclude phi-4 (<|im_sep|>) and SmolVLM (<end_of_utterance>)
+        # which reuse <|im_start|> but are not standard chatml.
+        if "<|im_sep|>" not in template and "<end_of_utterance>" not in template:
+            return "chatml"
+
+    if "<|start_header_id|>" in template and "<|end_header_id|>" in template:
+        return "llama-3"
+
+    if "[INST]" in template:
+        return "mistral-instruct"
 
     return None
 
