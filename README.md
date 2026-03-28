@@ -263,6 +263,29 @@ CMAKE_ARGS="-DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_APPLE_SILICON_PROCESSOR=arm6
 
 To upgrade and rebuild `llama-cpp-python` add `--upgrade --force-reinstall --no-cache-dir` flags to the `pip install` command to ensure the package is rebuilt from source.
 
+### Offline / Air-Gapped Installation
+
+If you are installing `llama-cpp-python` on a machine without internet access (e.g. from a `.tar.gz` sdist), you must pass `--no-build-isolation` so that pip uses your already-installed build dependencies instead of trying to download them into a fresh isolated environment:
+
+```bash
+# 1. On a machine WITH internet, download the sdist and all build/runtime deps:
+pip download llama-cpp-python==0.3.7 --no-binary :all:  # sdist
+pip download "scikit-build-core[pyproject]>=0.9.2" pathspec packaging \
+    "typing-extensions>=4.5.0" "numpy>=1.20.0" "diskcache>=5.6.1" "jinja2>=2.11.3"
+
+# 2. Transfer the downloaded files to the air-gapped machine.
+
+# 3. On the air-gapped machine, install build deps first, then the package:
+pip install --no-index --find-links=/path/to/downloads \
+    "scikit-build-core[pyproject]>=0.9.2" pathspec packaging
+pip install --no-index --find-links=/path/to/downloads --no-build-isolation \
+    llama_cpp_python-0.3.7.tar.gz
+```
+
+**Why is `--no-build-isolation` needed?**
+
+By default, pip creates an isolated virtual environment for building packages and installs build dependencies (listed in `pyproject.toml` under `[build-system] requires`) into it. With `--no-index`, pip cannot download those dependencies, causing the build to fail — even if they are already installed in your environment. The `--no-build-isolation` flag tells pip to skip creating the isolated build environment and use the packages already available.
+
 ## High-level API
 
 [API Reference](https://llama-cpp-python.readthedocs.io/en/latest/api-reference/#high-level-api)
